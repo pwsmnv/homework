@@ -1,57 +1,59 @@
 import requests
+from bs4 import BeautifulSoup
 from tkinter import *
 
-class CurrencyConverter:
+class Converter:
     def __init__(self):
-        self.usd_rate = None
+        self.rate = None
+        self.get_rate()
 
-    def fetch_usd_rate(self):
-        url = "https://bank.gov.ua/NBU_Exchange/exchange?json"
-        response = requests.get(url)
-        data = response.json()
-        for item in data:
-            if item.get("CurrencyCodeL") == "USD":
-                self.usd_rate = float(item.get("Amount"))
-                return self.usd_rate
-        return None
+    def get_rate(self):
+        url = "https://bank.gov.ua/ua/markets/exchangerates"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for row in soup.find_all("tr"):
+            cols = row.find_all("td")
+            if len(cols) > 0 and cols[1].text.strip() == "USD":
+                self.rate = float(cols[4].text.replace(",", "."))
+                break
+        return self.rate
 
-    def convert_to_usd(self, amount_ua):
-        if self.usd_rate is None:
-            self.fetch_usd_rate()
-        return amount_ua / self.usd_rate
+    def to_usd(self, amount):
+        if self.rate is None:
+            self.get_rate()
+        return amount / self.rate
 
-converter = CurrencyConverter()
-usd_rate = converter.fetch_usd_rate()
+conv = Converter()
+rate = conv.rate
 
-if usd_rate is None:
+if rate is None:
     print("Не вдалося отримати курс долара.")
     exit()
 
-window = Tk()
-window.title("Конвертер UAH - USD")
-window.geometry("490x300")
-window.configure(background="#dfddb7")
-window.resizable(False, False)
+root = Tk()
+root.title("UAH - USD")
+root.geometry("490x300")
+root.configure(bg="#dfddb7")
+root.resizable(False, False)
 
-def convert_currency():
+def convert():
     try:
-        uah_amount = float(entry_amount.get())
-        usd_amount = converter.convert_to_usd(uah_amount)
-        label_result.config(text=f"{uah_amount:.2f} UAH ≈ {usd_amount:.2f} USD")
+        amt = float(entry.get())
+        usd = conv.to_usd(amt)
+        lbl_result.config(text=f"{amt:.2f} UAH ≈ {usd:.2f} USD")
     except ValueError:
-        label_result.config(text="Будь ласка, введіть число!")
+        lbl_result.config(text="Помилка. Введіть число.")
 
-label_rate = Label(window, text=f"Офіційний курс USD: 1 USD = {usd_rate:.4f} UAH", font=("Comic Sans MS", 13, "bold"), bg="#dfddb7", fg="black")
-label_rate.pack(pady=10)
-label_instruction = Label(window, text="Введіть суму в UAH:", font=("Comic Sans MS", 14), bg="#dfddb7")
-label_instruction.pack(pady=5)
+lbl_rate = Label(root, text=f"Курс USD: 1 USD = {rate:.4f} UAH", font=("Comic Sans MS", 13, "bold"), bg="#dfddb7")
+lbl_rate.pack(pady=10)
+lbl_instr = Label(root, text="Введіть суму в UAH:", font=("Comic Sans MS", 14), bg="#dfddb7")
+lbl_instr.pack(pady=5)
+entry = Entry(root, width=20, font=("Comic Sans MS", 13), bd=3, relief="ridge")
+entry.pack(pady=5)
+btn_convert = Button(root, text="Конвертувати", font=("Comic Sans MS", 12), bg="#c3b709", command=convert)
+btn_convert.pack(pady=10)
+lbl_result = Label(root, text="", font=("Comic Sans MS", 13, "bold"), bg="#dfddb7", fg="#5f5800")
+lbl_result.pack(pady=15)
 
-entry_amount = Entry(window, width=20, font=("Comic Sans MS", 13), bd=3, relief="ridge")
-entry_amount.pack(pady=5)
-
-button_convert = Button(window, text="Конвертувати", font=("Comic Sans MS", 12), bg="#c3b709", fg="black", command=convert_currency)
-button_convert.pack(pady=10)
-label_result = Label(window, text="", font=("Comic Sans MS", 13, "bold"), bg="#dfddb7", fg="#5f5800")
-label_result.pack(pady=15)
-
-window.mainloop()
+root.mainloop()
